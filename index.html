@@ -204,7 +204,7 @@
       }
       
       // 缩小方框逻辑
-      if (killInfo.ballsNumber === 3) {
+      if (killInfo.ballsNumber === 5) {
         const interval = setInterval(() => {
           const size = simulator.reduceBoxSize("box", 1);
           if (size && Math.min(size[0], size[1]) <= 250) {
@@ -273,3 +273,4 @@
 
 
 </html>
+
