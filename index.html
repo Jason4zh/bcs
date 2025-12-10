@@ -1,176 +1,92 @@
 <!DOCTYPE html>
 <html>
-
 <head>
-  <title>小球碰撞 BCS</title>
+  <title>小球碰撞</title>
   <style>
-    body {
-      margin: 0;
-      padding: 20px;
-      font-family: Arial, sans-serif;
-    }
-
-    #simCanvas {
-      border: 1px solid #ccc;
-    }
-
-    /* 按钮美化样式 */
-    button {
-      margin: 5px;
-      padding: 8px 16px;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 14px;
-      transition: all 0.3s ease;
-    }
-
-    #startBtn {
-      background-color: #4CAF50;
-      color: white;
-    }
-
-    #startBtn:hover {
-      background-color: #45a049;
-    }
-
-    #stopBtn {
-      background-color: #f44336;
-      color: white;
-    }
-
-    #stopBtn:hover {
-      background-color: #d32f2f;
-    }
-
-    #addBallBtn {
-      background-color: #2196F3;
-      color: white;
-    }
-
-    #addBallBtn:hover {
-      background-color: #0b7dda;
-    }
-
-    .info-container {
-      margin-top: 10px;
-      display: flex;
-      gap: 20px;
-    }
-
-    #killFeed {
-      padding: 10px;
-      border: 1px solid #ccc;
-      height: 150px;
-      width: 300px;
-      overflow-y: auto;
-      text-align: center;
-    }
-
-    #ballStats {
-      padding: 10px;
-      border: 1px solid #ccc;
-    }
-
-    #ballStats table {
-      border-collapse: collapse;
-      background-color: #fff;
-    }
-
-    #ballStats th, #ballStats td {
-      border: 1px solid #eee;
-      padding: 8px 12px;
-      text-align: center;
-    }
-
-    #ballStats th {
-      background-color: #f5f5f5;
-      font-weight: bold;
-      text-align: right; /* 表头右对齐 */
-    }
-
-    .color-indicator {
-      display: inline-block;
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-    }
+    body { margin: 0; padding: 20px; font-family: Arial; }
+    #simCanvas { border: 1px solid #ccc; }
+    button { margin: 5px; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+    #startBtn { background-color: #4CAF50; color: white; }
+    #startBtn:hover { background-color: #45a049; }
+    #startBtn:disabled { background-color: #cccccc; cursor: not-allowed; }
+    .info-container { margin-top: 10px; display: flex; gap: 20px; }
+    #killFeed { padding: 10px; border: 1px solid #ccc; height: 150px; width: 300px; overflow-y: auto; text-align: center; }
+    #ballStats { padding: 10px; border: 1px solid #ccc; }
+    #ballStats table { border-collapse: collapse; background-color: #fff; }
+    #ballStats th, #ballStats td { border: 1px solid #eee; padding: 8px 12px; text-align: center; }
+    #ballStats th { background-color: #f5f5f5; font-weight: bold; text-align: right; }
+    .color-indicator { display: inline-block; width: 20px; height: 20px; border-radius: 50%; }
+    .quantity-selector { display: inline-flex; align-items: center; margin: 5px; }
+    .quantity-btn { width: 30px; height: 30px; background-color: #f0f0f0; border: 1px solid #ccc; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .quantity-btn:hover { background-color: #e0e0e0; }
+    .quantity-btn:disabled { background-color: #f5f5f5; cursor: not-allowed; color: #999; }
+    .quantity-input { width: 60px; height: 28px; text-align: center; border: 1px solid #ccc; border-left: none; border-right: none; font-size: 16px; }
   </style>
 </head>
-
 <body>
   <canvas id="simCanvas" width="900" height="900"></canvas>
   <div class="info-container">
     <div id="killFeed"></div>
     <div id="ballStats">
-      <!-- 表头在左侧的表格 -->
       <table>
-        <tbody id="ballStatsTable">
-          <!-- 动态填充数据 -->
-        </tbody>
+        <tbody id="ballStatsTable"></tbody>
       </table>
     </div>
   </div>
   <div>
-    <button id="startBtn">开始</button>
-    <button id="stopBtn">停止</button>
-    <button id="addBallBtn">添加小球</button>
+    <button id="startBtn">开始游戏</button>
+    <div class="quantity-selector">
+      <button id="decreaseBtn" class="quantity-btn">-</button>
+      <input type="number" id="ballCountInput" class="quantity-input" value="6" min="1" max="20">
+      <button id="increaseBtn" class="quantity-btn">+</button>
+      <span style="margin-left: 10px;">小球数量</span>
+    </div>
   </div>
 
   <script src="bcs.js"></script>
   <script>
-    // 获取Canvas元素
     const canvas = document.getElementById('simCanvas');
     canvas.width = window.innerWidth - 100;
     canvas.height = window.innerHeight - 100;
     
-    // 创建模拟器实例
     const simulator = new BallCollisionSimulator(canvas, {
-      colors: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFBE0B']
+      colors: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFBE0B', '#FF9F1C', '#E63946', '#A8DADC', '#1D3557']
     });
 
-    // 存储每个小球的击杀数
-    const killCounts = {};
+    const startBtn = document.getElementById('startBtn');
+    const decreaseBtn = document.getElementById('decreaseBtn');
+    const increaseBtn = document.getElementById('increaseBtn');
+    const ballCountInput = document.getElementById('ballCountInput');
 
-    // 更新小球属性表格（表头在左侧，按质量从高到低排序，已删除序号行）
     function updateBallStats() {
       const tableBody = document.getElementById('ballStatsTable');
-      tableBody.innerHTML = ''; // 清空表格
+      tableBody.innerHTML = '';
 
-      // 获取小球并按质量从高到低排序
       const sortedBalls = simulator.getBalls().sort((a, b) => b.mass - a.mass);
+      const headers = ['编号', '颜色', '质量', '击杀数'];
 
-      // 定义要显示的表头（已移除序号）
-      const headers = ['颜色', '质量', '击杀数'];
-
-      // 为每个表头创建一行，左侧是表头文本，右侧是各小球对应的值
       headers.forEach((header, headerIndex) => {
         const row = document.createElement('tr');
-        
-        // 添加表头单元格（左侧）
         const th = document.createElement('th');
         th.textContent = header;
         row.appendChild(th);
         
-        // 为每个小球添加数据单元格（右侧）
         sortedBalls.forEach((ball) => {
-          // 初始化击杀数
-          if (killCounts[ball.id] === undefined) {
-            killCounts[ball.id] = 0;
-          }
-
           const td = document.createElement('td');
           
-          // 根据表头类型显示不同内容（已移除序号相关逻辑）
           switch(headerIndex) {
-            case 0: // 颜色
+            case 0:
+              td.textContent = ball.id;
+              td.style.fontWeight = 'bold';
+              break;
+            case 1:
               td.innerHTML = `<span class="color-indicator" style="background-color: ${ball.color};"></span>`;
               break;
-            case 1: // 质量
+            case 2:
               td.textContent = ball.mass;
               break;
-            case 2: // 击杀数
-              td.textContent = killCounts[ball.id];
+            case 3:
+              td.textContent = simulator.killCounts[ball.id] || 0;
               break;
           }
           
@@ -181,83 +97,77 @@
       });
     }
 
-    // 监听击杀事件
     simulator.onKill = (killInfo) => {
       const killFeedElement = document.getElementById('killFeed');
-
-      // 创建击杀播报
       const killEntry = document.createElement('div');
       killEntry.style.margin = '5px 0';
       killEntry.innerHTML = `
-        <span style="color: ${killInfo.killerColor}; font-size: 40px;">●</span>
+        <span style="color: ${killInfo.killerColor}; font-size: 40px;">●${killInfo.killerId}</span>
         击杀了
-        <span style="color: ${killInfo.victimColor}; font-size: 40px;">●</span>
+        <span style="color: ${killInfo.victimColor}; font-size: 40px;">●${killInfo.victimId}</span>
         ，剩余<span style="font-weight: bold">${killInfo.ballsNumber}</span>球。
-        ${killInfo.ballsNumber === 1 ? `<br><span style="color: ${killInfo.killerColor}; font-size: 40px;">●</span> 获胜！` : ''}
       `;
       
-      // 添加到顶部
       if (killFeedElement.firstChild) {
         killFeedElement.insertBefore(killEntry, killFeedElement.firstChild);
       } else {
         killFeedElement.appendChild(killEntry);
       }
-      
-      // 缩小方框逻辑
-      if (killInfo.ballsNumber === 5) {
-        const interval = setInterval(() => {
-          const size = simulator.reduceBoxSize("box", 1);
-          if (size && Math.min(size[0], size[1]) <= 250) {
-            clearInterval(interval);
-            simulator.placeKnifeRandomly();
-            simulator.placeHeartRandomly();
-          }
-        }, 20);
-      }
 
-      // 更新击杀数
-      const killerBall = simulator.getBalls().find(ball => ball.color === killInfo.killerColor);
-      if (killerBall) {
-        killCounts[killerBall.id] = (killCounts[killerBall.id] || 0) + 1;
-      }
-
-      // 更新表格
       updateBallStats();
     };
 
-    // 计算速度系数
     const t = (window.innerHeight - 100) * (window.innerWidth - 100) / 50000;
 
-    // 按钮事件
-    document.getElementById('startBtn').addEventListener('click', () => simulator.start());
-    document.getElementById('stopBtn').addEventListener('click', () => simulator.stop());
-
-    document.getElementById('addBallBtn').addEventListener('click', () => {
-      // 生成随机颜色
-      const color = `rgb(${Math.round(Math.random() * 255)}, ${Math.round(Math.random() * 255)}, ${Math.round(Math.random() * 255)})`;
+    startBtn.addEventListener('click', () => {
+      const ballCount = parseInt(ballCountInput.value);
       
-      // 添加小球
-      const ballId = simulator.addBall({
-        radius: 60,
-        mass: 6,
-        vx: (Math.random() * t / 2) + t / 2,
-        vy: (Math.random() * t / 2) + t / 2,
-        color: color
-      });
+      if (ballCount < 1) {
+        alert('小球数量必须至少为1');
+        return;
+      }
       
-      // 初始化击杀数
-      killCounts[ballId] = 0;
+      simulator.reset();
+      simulator.addBalls(ballCount);
+      simulator.start();
+      
+      startBtn.disabled = true;
+      decreaseBtn.disabled = true;
+      increaseBtn.disabled = true;
+      ballCountInput.disabled = true;
+      
       updateBallStats();
     });
 
-    // 重写动画循环以实时更新表格
+    decreaseBtn.addEventListener('click', () => {
+      let currentValue = parseInt(ballCountInput.value);
+      if (currentValue > 1) {
+        ballCountInput.value = currentValue - 1;
+      }
+    });
+
+    increaseBtn.addEventListener('click', () => {
+      let currentValue = parseInt(ballCountInput.value);
+      if (currentValue < 20) {
+        ballCountInput.value = currentValue + 1;
+      }
+    });
+
+    ballCountInput.addEventListener('change', () => {
+      let value = parseInt(ballCountInput.value);
+      if (isNaN(value) || value < 1) {
+        ballCountInput.value = 1;
+      } else if (value > 20) {
+        ballCountInput.value = 20;
+      }
+    });
+
     const originalAnimate = simulator._animate;
     simulator._animate = function() {
       originalAnimate.call(this);
       updateBallStats();
     };
 
-    // 加载道具图片
     const knife = new Image();
     knife.src = 'knife.png';
     simulator.setKnifeImage(knife);
@@ -266,11 +176,7 @@
     heart.src = 'heart.png';
     simulator.setHeartImage(heart);
 
-    // 初始化表格
     updateBallStats();
   </script>
 </body>
-
-
 </html>
-
