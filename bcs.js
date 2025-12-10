@@ -158,32 +158,30 @@ class BallCollisionSimulator {
     }
   }
 
-  addBalls(count) {
-    this.balls = [];
-    this.killCounts = {};
-    
-    for (let i = 0; i < count; i++) {
-      const color = this.colors[i % this.colors.length];
-      const id = i + 1;
-      
-      const ball = {
-        ...this.defaultBallConfig,
-        id,
-        color,
-        x: Math.random() * (this.box.width - 2 * this.defaultBallConfig.radius) + this.box.x + this.defaultBallConfig.radius,
-        y: Math.random() * (this.box.height - 2 * this.defaultBallConfig.radius) + this.box.y + this.defaultBallConfig.radius,
-        vx: (Math.random() - 0.5) * 4,
-        vy: (Math.random() - 0.5) * 4,
-        firstmass: this.defaultBallConfig.mass,
-        firstradius: this.defaultBallConfig.radius
-      };
-      
-      this.balls.push(ball);
-      this.killCounts[id] = 0;
+  addBall(config = {}) {
+    const mergedConfig = { ...this.defaultBallConfig, ...config };
+
+    mergedConfig.firstmass = mergedConfig.mass
+    mergedConfig.firstradius = mergedConfig.radius
+
+    if (mergedConfig.x === null) {
+      mergedConfig.x = Math.random() * (this.box.width - 2 * mergedConfig.radius) +
+        this.box.x + mergedConfig.radius;
     }
-    
-    this.initialBallCount = count;
-    this.currentShrinkStage = 0;
+    if (mergedConfig.y === null) {
+      mergedConfig.y = Math.random() * (this.box.height - 2 * mergedConfig.radius) +
+        this.box.y + mergedConfig.radius;
+    }
+
+    if (mergedConfig.color === null) {
+      mergedConfig.color = this.colors[this.balls.length % this.colors.length];
+    }
+
+    const id = this.balls.length + 1;
+    const ball = { ...mergedConfig, id };
+
+    this.balls.push(ball);
+    return id;
   }
 
   removeBall(id) {
@@ -215,7 +213,6 @@ class BallCollisionSimulator {
     this.placeKnifeRandomly();
     this.placeHeartRandomly();
     this.currentShrinkStage = 0;
-    this.killCounts = {};
   }
 
   _drawBalls() {
@@ -352,61 +349,21 @@ class BallCollisionSimulator {
             time: new Date()
           });
 
-          this.killCounts[killer.id] = (this.killCounts[killer.id] || 0) + 1;
-
           if (this.onKill) {
             this.onKill({
               killerId: killer.id,
               killerColor: killer.color,
               victimId: deadBall.id,
               victimColor: deadBall.color,
-              ballsNumber: this.balls.length - 1,
-              killCounts: this.killCounts
+              ballsNumber: this.balls.length - 1
             });
           }
         }
 
         this.balls.splice(i, 1);
         i--;
-        
-        this._checkShrinkCircle();
       }
     }
-  }
-  
-  _checkShrinkCircle() {
-    if (this.initialBallCount <= 0) return;
-    
-    const remainingBalls = this.balls.length;
-    const shrinkThreshold = Math.ceil(this.initialBallCount * (1 - (this.currentShrinkStage + 1) / this.maxShrinkStages));
-    
-    if (remainingBalls <= shrinkThreshold && this.currentShrinkStage < this.maxShrinkStages) {
-      this.currentShrinkStage++;
-      this._shrinkBox();
-    }
-    
-    if (remainingBalls === 1 && this.balls.length > 0) {
-      const winner = this.balls[0];
-      const killCount = this.killCounts[winner.id] || 0;
-      
-      setTimeout(() => {
-        alert(`游戏结束！\n\n获胜者：小球 #${winner.id}\n剩余血量：${winner.mass}\n击杀数：${killCount}`);
-      }, 500);
-    }
-  }
-  
-  _shrinkBox() {
-    const shrinkRatio = 0.8;
-    const centerX = this.box.x + this.box.width / 2;
-    const centerY = this.box.y + this.box.height / 2;
-    
-    this.box.width *= shrinkRatio;
-    this.box.height *= shrinkRatio;
-    this.box.x = centerX - this.box.width / 2;
-    this.box.y = centerY - this.box.height / 2;
-    
-    this.placeKnifeRandomly();
-    this.placeHeartRandomly();
   }
 
   _animate() {
@@ -424,7 +381,7 @@ class BallCollisionSimulator {
   }
 
   start() {
-    if (!this.animationId && this.balls.length > 0) {
+    if (!this.animationId) {
       this._animate();
     }
   }
@@ -433,6 +390,7 @@ class BallCollisionSimulator {
     if (this.animationId) {
       cancelAnimationFrame(this.animationId);
       this.animationId = null;
+      clearInterval(this.interval)
     }
   }
 

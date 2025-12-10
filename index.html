@@ -1,14 +1,18 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>小球碰撞</title>
+  <title>小球碰撞 BCS</title>
   <style>
-    body { margin: 0; padding: 20px; font-family: Arial; }
+    body { margin: 0; padding: 20px; font-family: Arial, sans-serif; }
     #simCanvas { border: 1px solid #ccc; }
-    button { margin: 5px; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+    button { margin: 5px; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; transition: all 0.3s ease; }
     #startBtn { background-color: #4CAF50; color: white; }
     #startBtn:hover { background-color: #45a049; }
     #startBtn:disabled { background-color: #cccccc; cursor: not-allowed; }
+    #stopBtn { background-color: #f44336; color: white; }
+    #stopBtn:hover { background-color: #d32f2f; }
+    #addBallBtn { background-color: #2196F3; color: white; }
+    #addBallBtn:hover { background-color: #0b7dda; }
     .info-container { margin-top: 10px; display: flex; gap: 20px; }
     #killFeed { padding: 10px; border: 1px solid #ccc; height: 150px; width: 300px; overflow-y: auto; text-align: center; }
     #ballStats { padding: 10px; border: 1px solid #ccc; }
@@ -34,12 +38,12 @@
     </div>
   </div>
   <div>
-    <button id="startBtn">开始游戏</button>
+    <button id="startBtn">开始</button>
     <div class="quantity-selector">
       <button id="decreaseBtn" class="quantity-btn">-</button>
       <input type="number" id="ballCountInput" class="quantity-input" value="6" min="1" max="20">
       <button id="increaseBtn" class="quantity-btn">+</button>
-      <span style="margin-left: 10px;">小球数量</span>
+      <span style="margin-left: 10px;">初始小球数量</span>
     </div>
   </div>
 
@@ -50,13 +54,12 @@
     canvas.height = window.innerHeight - 100;
     
     const simulator = new BallCollisionSimulator(canvas, {
-      colors: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFBE0B', '#FF9F1C', '#E63946', '#A8DADC', '#1D3557']
+      colors: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFBE0B']
     });
 
-    const startBtn = document.getElementById('startBtn');
-    const decreaseBtn = document.getElementById('decreaseBtn');
-    const increaseBtn = document.getElementById('increaseBtn');
-    const ballCountInput = document.getElementById('ballCountInput');
+    const killCounts = {};
+    let initialBallCount = 0;
+    let gameStarted = false;
 
     function updateBallStats() {
       const tableBody = document.getElementById('ballStatsTable');
@@ -72,6 +75,10 @@
         row.appendChild(th);
         
         sortedBalls.forEach((ball) => {
+          if (killCounts[ball.id] === undefined) {
+            killCounts[ball.id] = 0;
+          }
+
           const td = document.createElement('td');
           
           switch(headerIndex) {
@@ -86,7 +93,7 @@
               td.textContent = ball.mass;
               break;
             case 3:
-              td.textContent = simulator.killCounts[ball.id] || 0;
+              td.textContent = killCounts[ball.id];
               break;
           }
           
@@ -106,6 +113,7 @@
         击杀了
         <span style="color: ${killInfo.victimColor}; font-size: 40px;">●${killInfo.victimId}</span>
         ，剩余<span style="font-weight: bold">${killInfo.ballsNumber}</span>球。
+        ${killInfo.ballsNumber === 1 ? `<br><span style="color: ${killInfo.killerColor}; font-size: 40px;">●${killInfo.killerId}</span> 获胜！` : ''}
       `;
       
       if (killFeedElement.firstChild) {
@@ -114,12 +122,43 @@
         killFeedElement.appendChild(killEntry);
       }
 
+      if (killInfo.ballsNumber === 5 && initialBallCount > 5) {
+        const interval = setInterval(() => {
+          const size = simulator.reduceBoxSize("box", 1);
+          if (size && Math.min(size[0], size[1]) <= 250) {
+            clearInterval(interval);
+            simulator.placeKnifeRandomly();
+            simulator.placeHeartRandomly();
+          }
+        }, 20);
+      }
+
+      const killerBall = simulator.getBalls().find(ball => ball.id === killInfo.killerId);
+      if (killerBall) {
+        killCounts[killerBall.id] = (killCounts[killerBall.id] || 0) + 1;
+      }
+
+      if (killInfo.ballsNumber === 1) {
+        const winner = simulator.getBalls()[0];
+        const winnerKills = killCounts[winner.id] || 0;
+        setTimeout(() => {
+          alert(`游戏结束！\n\n获胜者：小球 #${winner.id}\n剩余血量：${winner.mass}\n击杀数：${winnerKills}`);
+        }, 500);
+      }
+
       updateBallStats();
     };
 
     const t = (window.innerHeight - 100) * (window.innerWidth - 100) / 50000;
 
+    const startBtn = document.getElementById('startBtn');
+    const decreaseBtn = document.getElementById('decreaseBtn');
+    const increaseBtn = document.getElementById('increaseBtn');
+    const ballCountInput = document.getElementById('ballCountInput');
+
     startBtn.addEventListener('click', () => {
+      if (gameStarted) return;
+      
       const ballCount = parseInt(ballCountInput.value);
       
       if (ballCount < 1) {
@@ -127,16 +166,32 @@
         return;
       }
       
-      simulator.reset();
-      simulator.addBalls(ballCount);
-      simulator.start();
+      initialBallCount = ballCount;
+      gameStarted = true;
       
       startBtn.disabled = true;
       decreaseBtn.disabled = true;
       increaseBtn.disabled = true;
       ballCountInput.disabled = true;
       
+      simulator.reset();
+      
+      for (let i = 0; i < ballCount; i++) {
+        const color = `rgb(${Math.round(Math.random() * 255)}, ${Math.round(Math.random() * 255)}, ${Math.round(Math.random() * 255)})`;
+        
+        const ballId = simulator.addBall({
+          radius: 60,
+          mass: 6,
+          vx: (Math.random() * t / 2) + t / 2,
+          vy: (Math.random() * t / 2) + t / 2,
+          color: color
+        });
+        
+        killCounts[ballId] = 0;
+      }
+      
       updateBallStats();
+      simulator.start();
     });
 
     decreaseBtn.addEventListener('click', () => {
